@@ -2,17 +2,16 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Wallet, JsonRpcProvider, parseEther, formatEther, isAddress } from 'ethers';
-import { KeyRound, Copy, Check, ExternalLink, Send, Lock, Droplets, Activity } from 'lucide-react';
+import { KeyRound, Copy, Check, ExternalLink, Send, LogOut, Droplets, Activity, History, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
-const EXPLORER = 'https://amoy.polygonscan.com';
+const NETWORKS = [
+  { id: 'amoy', short: 'AMOY', name: 'Polygon Amoy', symbol: 'POL', binance: 'POLUSDT', explorer: 'https://amoy.polygonscan.com', faucet: 'https://faucet.polygon.technology' },
+  { id: 'sepolia', short: 'SEPOLIA', name: 'Ethereum Sepolia', symbol: 'ETH', binance: 'ETHUSDT', explorer: 'https://sepolia.etherscan.io', faucet: 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia' },
+  { id: 'base', short: 'BASE', name: 'Base Sepolia', symbol: 'ETH', binance: 'ETHUSDT', explorer: 'https://sepolia.basescan.org', faucet: 'https://www.coinbase.com/faucets/base-sepolia-faucet' },
+];
 
-function rpcUrl() {
-  if (typeof window === 'undefined') return '/api/rpc';
-  return window.location.origin + '/api/rpc';
-}
-
-async function rpcCall(method: string, params: any[]): Promise<any> {
-  const res = await fetch(rpcUrl(), {
+async function rpcCall(netId: string, method: string, params: any[]): Promise<any> {
+  const res = await fetch(window.location.origin + `/api/rpc?net=${netId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
@@ -25,10 +24,14 @@ async function rpcCall(method: string, params: any[]): Promise<any> {
 
 export default function Dashboard() {
   const router = useRouter();
+  const [netIndex, setNetIndex] = useState(0);
+  const network = NETWORKS[netIndex];
+
   const [address, setAddress] = useState('');
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
-  const [polPrice, setPolPrice] = useState(0);
+  const [price, setPrice] = useState(0);
+  const [activity, setActivity] = useState<any[]>([]);
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [sending, setSending] = useState(false);
@@ -36,41 +39,51 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
+  const loadActivity = (netId: string, addr: string) => {
+    fetch(`/api/activity?net=${netId}&address=${addr}`)
+      .then(r => r.json())
+      .then(d => setActivity((d.items || []).slice(0, 8)))
+      .catch(() => setActivity([]));
+  };
+
   useEffect(() => {
     const pk = sessionStorage.getItem('vaultx_pk');
     if (!pk) {
       router.push('/');
       return;
     }
+    const provider = new JsonRpcProvider(window.location.origin + `/api/rpc?net=${network.id}`);
+    const w = new Wallet(pk, provider);
+    setWallet(w);
+    setAddress(w.address);
+    setBalance(null);
+    setTxHash('');
+    setError('');
     (async () => {
-      const provider = new JsonRpcProvider(rpcUrl());
-      const w = new Wallet(pk, provider);
-      setWallet(w);
-      setAddress(w.address);
       try {
-        const hex = await rpcCall('eth_getBalance', [w.address, 'latest']);
+        const hex = await rpcCall(network.id, 'eth_getBalance', [w.address, 'latest']);
         setBalance(formatEther(BigInt(hex)));
-      } catch (e: any) {
-        setError('Balance load nahi hua: ' + (e.message || ''));
+      } catch {
         setBalance('0');
       }
     })();
-  }, [router]);
+    loadActivity(network.id, w.address);
+  }, [netIndex, router]);
 
   useEffect(() => {
-    fetch('https://api.binance.com/api/v3/ticker/price?symbol=POLUSDT')
+    fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${network.binance}`)
       .then(r => r.json())
-      .then(d => setPolPrice(parseFloat(d.price)))
+      .then(d => setPrice(parseFloat(d.price)))
       .catch(() => {});
-    const ws = new WebSocket('wss://stream.binance.com:9443/ws/polusdt@miniTicker');
+    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${network.binance.toLowerCase()}@miniTicker`);
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data);
-        setPolPrice(parseFloat(d.c));
+        setPrice(parseFloat(d.c));
       } catch {}
     };
     return () => ws.close();
-  }, []);
+  }, [netIndex]);
 
   const copyAddress = () => {
     navigator.clipboard.writeText(address);
@@ -78,7 +91,7 @@ export default function Dashboard() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const lockWallet = () => {
+  const logout = () => {
     sessionStorage.removeItem('vaultx_pk');
     router.push('/');
   };
@@ -102,17 +115,29 @@ export default function Dashboard() {
       setAmount('');
       setTimeout(async () => {
         try {
-          const hex = await rpcCall('eth_getBalance', [address, 'latest']);
+          const hex = await rpcCall(network.id, 'eth_getBalance', [address, 'latest']);
           setBalance(formatEther(BigInt(hex)));
         } catch {}
-      }, 5000);
+        loadActivity(network.id, address);
+      }, 6000);
     } catch (e: any) {
       setError(e.shortMessage || e.message || 'Transaction fail ho gayi');
     }
     setSending(false);
   };
 
-  const usdValue = balance ? parseFloat(balance) * polPrice : 0;
+  const usdValue = balance ? parseFloat(balance) * price : 0;
+
+  const shortAddr = (a: string) => (a ? `${a.slice(0, 6)}...${a.slice(-4)}` : 'Contract');
+
+  const timeAgo = (ts: string) => {
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1) return 'abhi abhi';
+    if (m < 60) return `${m} min pehle`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} ghante pehle`;
+    return `${Math.floor(h / 24)} din pehle`;
+  };
 
   return (
     <main className="min-h-screen bg-[#050505] text-white relative">
@@ -130,33 +155,48 @@ export default function Dashboard() {
               <KeyRound className="w-4 h-4 text-white" />
             </div>
             <span className="text-sm font-semibold">VaultX</span>
-            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400">
-              AMOY TESTNET
-            </span>
           </div>
-          <button onClick={lockWallet} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-xs font-semibold text-white/70 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all">
-            <Lock className="w-3.5 h-3.5" /> Lock
+          <button onClick={logout} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-xs font-semibold text-white/70 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all">
+            <LogOut className="w-3.5 h-3.5" /> Logout
           </button>
         </div>
       </header>
 
       <div className="relative max-w-2xl mx-auto px-4 py-8 space-y-4">
+        {/* Network Switcher */}
+        <div className="flex gap-2">
+          {NETWORKS.map((n, i) => (
+            <button
+              key={n.id}
+              onClick={() => setNetIndex(i)}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all ${
+                i === netIndex
+                  ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg shadow-purple-500/20'
+                  : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/10'
+              }`}
+            >
+              {n.short}
+            </button>
+          ))}
+        </div>
+
+        {/* Balance Card */}
         <div className="bg-gradient-to-br from-purple-500/10 to-blue-600/10 border border-purple-500/20 rounded-3xl p-6 backdrop-blur-xl">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-xs text-white/40 uppercase tracking-widest font-bold">Total Balance</span>
+            <span className="text-xs text-white/40 uppercase tracking-widest font-bold">{network.name}</span>
             <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
-              LIVE POL: ${polPrice.toFixed(4)}
+              LIVE {network.symbol}: ${price.toLocaleString()}
             </span>
           </div>
           <div className="flex items-end gap-3 mb-1">
             <p className="text-4xl font-bold font-mono">
               {balance === null ? '...' : parseFloat(balance).toFixed(4)}
             </p>
-            <span className="text-white/50 font-semibold mb-1">POL</span>
+            <span className="text-white/50 font-semibold mb-1">{network.symbol}</span>
           </div>
           <p className="text-sm text-white/40 font-mono mb-5">≈ ${usdValue.toFixed(4)} USD</p>
 
@@ -165,32 +205,32 @@ export default function Dashboard() {
             <button onClick={copyAddress} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-white/60" />}
             </button>
-            <a href={`${EXPLORER}/address/${address}`} target="_blank" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
+            <a href={`${network.explorer}/address/${address}`} target="_blank" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
               <ExternalLink className="w-4 h-4 text-white/60" />
             </a>
           </div>
         </div>
 
+        {/* Faucet */}
         {balance !== null && parseFloat(balance) === 0 && (
           <div className="bg-amber-500/[0.08] border border-amber-500/20 rounded-2xl p-5 backdrop-blur-xl">
             <div className="flex items-start gap-3">
               <Droplets className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-sm text-amber-300 mb-1">Free Test POL Lein</h3>
-                <p className="text-xs text-white/50 mb-3 leading-relaxed">
-                  Amoy wallet mein sirf POL chalta hai (Sepolia ETH yahan nahi dikhega - wo alag blockchain hai).
-                </p>
-                <a href="https://faucet.polygon.technology" target="_blank" className="inline-block px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-[11px] font-bold text-amber-300 hover:bg-amber-500/30 transition">
-                  Polygon Faucet
+                <h3 className="font-semibold text-sm text-amber-300 mb-1">Free Test {network.symbol} Lein</h3>
+                <p className="text-xs text-white/50 mb-3">Balance khali hai - {network.name} faucet se free test tokens lein.</p>
+                <a href={network.faucet} target="_blank" className="inline-block px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-[11px] font-bold text-amber-300 hover:bg-amber-500/30 transition">
+                  Faucet Kholein
                 </a>
               </div>
             </div>
           </div>
         )}
 
+        {/* Send */}
         <div className="bg-white/[0.03] border border-white/[0.06] rounded-3xl p-6 backdrop-blur-xl">
           <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-white/40 mb-5">
-            <Send className="w-4 h-4 text-purple-400" /> Send POL
+            <Send className="w-4 h-4 text-purple-400" /> Send {network.symbol}
           </h2>
 
           <div className="space-y-3 mb-4">
@@ -204,7 +244,7 @@ export default function Dashboard() {
             <input
               type="number"
               step="any"
-              placeholder="Amount (POL)"
+              placeholder={`Amount (${network.symbol})`}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm font-mono focus:outline-none focus:border-purple-500 transition"
@@ -220,7 +260,7 @@ export default function Dashboard() {
           {txHash && (
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 mb-4">
               <p className="text-emerald-400 text-xs mb-2">✅ Transaction sent!</p>
-              <a href={`${EXPLORER}/tx/${txHash}`} target="_blank" className="font-mono text-[10px] text-emerald-300 underline break-all">
+              <a href={`${network.explorer}/tx/${txHash}`} target="_blank" className="font-mono text-[10px] text-emerald-300 underline break-all">
                 {txHash}
               </a>
             </div>
@@ -235,8 +275,50 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {/* Recent Activity */}
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-3xl p-6 backdrop-blur-xl">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-white/40 mb-5">
+            <History className="w-4 h-4 text-purple-400" /> Recent Activity
+          </h2>
+          {activity.length === 0 ? (
+            <p className="text-xs text-white/40 text-center py-4">
+              Abhi koi transaction nahi - pehli transaction bhejein!
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {activity.map((tx: any) => {
+                const isSent = (tx.from?.hash || '').toLowerCase() === address.toLowerCase();
+                return (
+                  <a
+                    key={tx.hash}
+                    href={`${network.explorer}/tx/${tx.hash}`}
+                    target="_blank"
+                    className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 hover:bg-white/[0.06] transition"
+                  >
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${isSent ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                      {isSent ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold">{isSent ? 'Sent' : 'Received'}</p>
+                      <p className="text-[10px] text-white/40 font-mono">
+                        {isSent ? shortAddr(tx.to?.hash || '') : shortAddr(tx.from?.hash || '')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-xs font-bold font-mono ${isSent ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {isSent ? '-' : '+'}{parseFloat(formatEther(BigInt(tx.value || '0'))).toFixed(4)} {network.symbol}
+                      </p>
+                      <p className="text-[10px] text-white/30">{timeAgo(tx.timestamp)}</p>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <p className="text-center text-[11px] text-white/30 flex items-center justify-center gap-1.5">
-          <Activity className="w-3 h-3" /> Powered by Polygon Amoy + Binance WebSocket
+          <Activity className="w-3 h-3" /> 3 Networks · 1 Wallet · Powered by Infura + Binance
         </p>
       </div>
     </main>

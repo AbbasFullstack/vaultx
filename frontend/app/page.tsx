@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Wallet as WalletIcon, KeyRound, Sparkles, ArrowRight, Lock, Trash2 } from 'lucide-react';
+import { Wallet as WalletIcon, KeyRound, Sparkles, ArrowRight, Lock, Trash2, Download, Plus } from 'lucide-react';
 import { Wallet } from 'ethers';
 import { hasWallet, getKeystore, clearWallet } from '@/lib/wallet';
 
@@ -85,6 +85,19 @@ export default function Home() {
               >
                 {unlocking ? 'Unlocking...' : 'Unlock Wallet →'}
               </button>
+
+              <div className="flex gap-2 mt-3">
+                <Link href="/import" className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/70 hover:bg-purple-500/10 hover:border-purple-500/30 hover:text-purple-300 transition-all">
+                  <Download className="w-3.5 h-3.5" /> Import Wallet
+                </Link>
+                <Link href="/create" className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/70 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-300 transition-all">
+                  <Plus className="w-3.5 h-3.5" /> Create New
+                </Link>
+              </div>
+              <p className="text-[10px] text-white/30 mt-2 text-center">
+                Import/Create se current wallet replace hogi - pehle phrase backup karein!
+              </p>
+
               <button
                 onClick={deleteWallet}
                 className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/50 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all"
@@ -107,13 +120,13 @@ export default function Home() {
                 Create New Wallet
                 <ArrowRight className="w-5 h-5" />
               </Link>
-              <button
-                disabled
-                className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-white/5 border border-white/10 font-bold text-white/40 cursor-not-allowed"
+              <Link
+                href="/import"
+                className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-white/5 border border-white/10 font-bold text-white/70 hover:bg-white/10 transition-all"
               >
+                <Download className="w-5 h-5" />
                 Import Existing Wallet
-                <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full">Coming Soon</span>
-              </button>
+              </Link>
             </div>
           </>
         )}
