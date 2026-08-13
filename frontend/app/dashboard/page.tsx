@@ -4,15 +4,15 @@ import { useRouter } from 'next/navigation';
 import { Wallet, JsonRpcProvider, parseEther, formatEther, isAddress } from 'ethers';
 import { KeyRound, Copy, Check, ExternalLink, Send, Lock, Droplets, Activity } from 'lucide-react';
 
-const RPC_LIST = [
-  '/api/rpc',
-  '/api/rpc',
-  '/api/rpc',
-];
 const EXPLORER = 'https://amoy.polygonscan.com';
 
-async function rpcCall(url: string, method: string, params: any[]): Promise<any> {
-  const res = await fetch(url, {
+function rpcUrl() {
+  if (typeof window === 'undefined') return '/api/rpc';
+  return window.location.origin + '/api/rpc';
+}
+
+async function rpcCall(method: string, params: any[]): Promise<any> {
+  const res = await fetch(rpcUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
@@ -36,7 +36,6 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Wallet + best RPC + balance
   useEffect(() => {
     const pk = sessionStorage.getItem('vaultx_pk');
     if (!pk) {
@@ -44,28 +43,20 @@ export default function Dashboard() {
       return;
     }
     (async () => {
-      let good = RPC_LIST[0];
-      for (const url of RPC_LIST) {
-        try {
-          await rpcCall(url, 'eth_blockNumber', []);
-          good = url;
-          break;
-        } catch {}
-      }
-      const provider = new JsonRpcProvider(good);
+      const provider = new JsonRpcProvider(rpcUrl());
       const w = new Wallet(pk, provider);
       setWallet(w);
       setAddress(w.address);
       try {
-        const hex = await rpcCall(good, 'eth_getBalance', [w.address, 'latest']);
+        const hex = await rpcCall('eth_getBalance', [w.address, 'latest']);
         setBalance(formatEther(BigInt(hex)));
-      } catch {
+      } catch (e: any) {
+        setError('Balance load nahi hua: ' + (e.message || ''));
         setBalance('0');
       }
     })();
   }, [router]);
 
-  // Live POL price (REST + WebSocket)
   useEffect(() => {
     fetch('https://api.binance.com/api/v3/ticker/price?symbol=POLUSDT')
       .then(r => r.json())
@@ -111,7 +102,7 @@ export default function Dashboard() {
       setAmount('');
       setTimeout(async () => {
         try {
-          const hex = await rpcCall(RPC_LIST[0], 'eth_getBalance', [address, 'latest']);
+          const hex = await rpcCall('eth_getBalance', [address, 'latest']);
           setBalance(formatEther(BigInt(hex)));
         } catch {}
       }, 5000);
@@ -187,13 +178,11 @@ export default function Dashboard() {
               <div>
                 <h3 className="font-semibold text-sm text-amber-300 mb-1">Free Test POL Lein</h3>
                 <p className="text-xs text-white/50 mb-3 leading-relaxed">
-                  Balance khali hai. Amoy faucet se free test POL lein.
+                  Amoy wallet mein sirf POL chalta hai (Sepolia ETH yahan nahi dikhega - wo alag blockchain hai).
                 </p>
-                <div className="flex gap-2 flex-wrap">
-                  <a href="https://faucet.polygon.technology" target="_blank" className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-[11px] font-bold text-amber-300 hover:bg-amber-500/30 transition">
-                    Polygon Faucet
-                  </a>
-                </div>
+                <a href="https://faucet.polygon.technology" target="_blank" className="inline-block px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-[11px] font-bold text-amber-300 hover:bg-amber-500/30 transition">
+                  Polygon Faucet
+                </a>
               </div>
             </div>
           </div>
