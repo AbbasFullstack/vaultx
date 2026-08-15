@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Wallet, JsonRpcProvider, parseEther, formatEther, isAddress } from 'ethers';
-import { KeyRound, Copy, Check, ExternalLink, Send, LogOut, Droplets, Activity, History, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { KeyRound, Copy, Check, ExternalLink, Send, LogOut, Droplets, Activity, History, ArrowUpRight, ArrowDownLeft, Eye, EyeOff } from 'lucide-react';
 
 const NETWORKS = [
   { id: 'amoy', short: 'AMOY', name: 'Polygon Amoy', symbol: 'POL', binance: 'POLUSDT', explorer: 'https://amoy.polygonscan.com', faucet: 'https://faucet.polygon.technology' },
@@ -29,6 +29,8 @@ export default function Dashboard() {
 
   const [address, setAddress] = useState('');
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [privateKey, setPrivateKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
   const [price, setPrice] = useState(0);
   const [activity, setActivity] = useState<any[]>([]);
@@ -39,11 +41,45 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const loadActivity = (netId: string, addr: string) => {
-    fetch(`/api/activity?net=${netId}&address=${addr}`)
-      .then(r => r.json())
-      .then(d => setActivity((d.items || []).slice(0, 8)))
-      .catch(() => setActivity([]));
+  const loadActivity = async (netId: string, addr: string) => {
+    const chainIds: Record<string, string> = { amoy: '80002', sepolia: '11155111', base: '84532' };
+    const blockscout: Record<string, string> = {
+      amoy: 'https://polygon-amoy.blockscout.com',
+      sepolia: 'https://eth-sepolia.blockscout.com',
+      base: 'https://base-sepolia.blockscout.com',
+    };
+    // 1) Routescan (browser se)
+    try {
+      const r = await fetch(`https://api.routescan.io/v2/network/testnet/evm/${chainIds[netId]}/etherscan?module=account&action=txlist&address=${addr}&page=1&offset=10&sort=desc`);
+      const j = await r.json();
+      if (Array.isArray(j.result) && j.result.length > 0) {
+        setActivity(j.result.map((t: any) => ({
+          hash: t.hash,
+          from: { hash: t.from },
+          to: { hash: t.to },
+          value: t.value,
+          timestamp: new Date(parseInt(t.timeStamp) * 1000).toISOString(),
+        })));
+        return;
+      }
+    } catch {}
+    // 2) Blockscout (browser se)
+    try {
+      const r = await fetch(`${blockscout[netId]}/api/v2/addresses/${addr}/transactions?limit=10`);
+      const j = await r.json();
+      if (Array.isArray(j.items) && j.items.length > 0) {
+        setActivity(j.items.slice(0, 8));
+        return;
+      }
+    } catch {}
+    // 3) Server proxy fallback
+    try {
+      const r = await fetch(`/api/activity?net=${netId}&address=${addr}`);
+      const j = await r.json();
+      setActivity((j.items || []).slice(0, 8));
+    } catch {
+      setActivity([]);
+    }
   };
 
   useEffect(() => {
@@ -56,6 +92,7 @@ export default function Dashboard() {
     const w = new Wallet(pk, provider);
     setWallet(w);
     setAddress(w.address);
+    setPrivateKey(pk);
     setBalance(null);
     setTxHash('');
     setError('');
@@ -87,6 +124,12 @@ export default function Dashboard() {
 
   const copyAddress = () => {
     navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyKey = () => {
+    navigator.clipboard.writeText(privateKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -209,6 +252,31 @@ export default function Dashboard() {
               <ExternalLink className="w-4 h-4 text-white/60" />
             </a>
           </div>
+
+          {/* Export Private Key */}
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              onClick={() => setShowKey(!showKey)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-red-400 hover:border-red-500/30 transition"
+            >
+              {showKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              {showKey ? 'Hide Private Key' : 'Export Private Key'}
+            </button>
+            {showKey && (
+              <button
+                onClick={copyKey}
+                className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white transition"
+              >
+                {copied ? '✓ Copied' : 'Copy Key'}
+              </button>
+            )}
+          </div>
+          {showKey && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mt-2">
+              <p className="text-[10px] text-red-300 mb-1 font-bold">⚠️ SECRET - kisi ko mat dikhana!</p>
+              <p className="font-mono text-[10px] text-red-200 break-all">{privateKey}</p>
+            </div>
+          )}
         </div>
 
         {/* Faucet */}
