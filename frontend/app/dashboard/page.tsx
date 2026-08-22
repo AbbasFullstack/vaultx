@@ -3,6 +3,20 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Wallet, JsonRpcProvider, parseEther, formatEther, isAddress } from 'ethers';
 import { KeyRound, Copy, Check, ExternalLink, Send, LogOut, Droplets, Activity, History, ArrowUpRight, ArrowDownLeft, Eye, EyeOff } from 'lucide-react';
+import { ApiClient } from '@/lib/generated/vaultx-api-client';
+
+type ActivityTransaction = {
+  hash: string;
+  from?: { hash?: string };
+  to?: { hash?: string };
+  value?: string;
+  timestamp: string;
+};
+
+type JsonRpcResponse = {
+  result?: unknown;
+  error?: { message?: string };
+};
 
 const NETWORKS = [
   { id: 'amoy', short: 'AMOY', name: 'Polygon Amoy', symbol: 'POL', binance: 'POLUSDT', explorer: 'https://amoy.polygonscan.com', faucet: 'https://faucet.polygon.technology' },
@@ -10,15 +24,42 @@ const NETWORKS = [
   { id: 'base', short: 'BASE', name: 'Base Sepolia', symbol: 'ETH', binance: 'ETHUSDT', explorer: 'https://sepolia.basescan.org', faucet: 'https://www.coinbase.com/faucets/base-sepolia-faucet' },
 ];
 
-async function rpcCall(netId: string, method: string, params: any[]): Promise<any> {
-  const res = await fetch(window.location.origin + `/api/rpc?net=${netId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  if (!res.ok) throw new Error('RPC HTTP error');
-  const json = await res.json();
-  if (json.error) throw new Error(json.error.message);
+function toActivityTransaction(value: unknown): ActivityTransaction | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const transaction = value as Record<string, unknown>;
+  const hash = typeof transaction.hash === 'string' ? transaction.hash : '';
+  if (!hash) return null;
+
+  const getAddress = (entry: unknown) => {
+    if (typeof entry === 'string') return entry;
+    if (entry && typeof entry === 'object' && typeof (entry as Record<string, unknown>).hash === 'string') {
+      return (entry as Record<string, unknown>).hash as string;
+    }
+    return '';
+  };
+
+  const timestampValue = transaction.timestamp ?? transaction.timeStamp;
+  const timestamp = typeof timestampValue === 'string' && Number.isNaN(Number(timestampValue))
+    ? timestampValue
+    : new Date(Number(timestampValue ?? 0) * 1000).toISOString();
+
+  return {
+    hash,
+    from: { hash: getAddress(transaction.from) },
+    to: { hash: getAddress(transaction.to) },
+    value: String(transaction.value ?? '0'),
+    timestamp,
+  };
+}
+
+async function rpcCall(netId: string, method: string, params: unknown[]): Promise<unknown> {
+  const api = new ApiClient(window.location.origin);
+  const json = await api.proxyJsonRpcRequest({
+    query: { net: netId },
+    body: { jsonrpc: '2.0', id: 1, method, params },
+  }) as JsonRpcResponse;
+  if (json.error) throw new Error(json.error.message || 'RPC request failed');
   return json.result;
 }
 
@@ -33,13 +74,14 @@ export default function Dashboard() {
   const [showKey, setShowKey] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
   const [price, setPrice] = useState(0);
-  const [activity, setActivity] = useState<any[]>([]);
+  const [activity, setActivity] = useState<ActivityTransaction[]>([]);
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [sending, setSending] = useState(false);
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState(0);
 
   const loadActivity = async (netId: string, addr: string) => {
     const chainIds: Record<string, string> = { amoy: '80002', sepolia: '11155111', base: '84532' };
@@ -51,32 +93,29 @@ export default function Dashboard() {
     // 1) Routescan (browser se)
     try {
       const r = await fetch(`https://api.routescan.io/v2/network/testnet/evm/${chainIds[netId]}/etherscan?module=account&action=txlist&address=${addr}&page=1&offset=10&sort=desc`);
-      const j = await r.json();
+      const j = await r.json() as { result?: unknown };
       if (Array.isArray(j.result) && j.result.length > 0) {
-        setActivity(j.result.map((t: any) => ({
-          hash: t.hash,
-          from: { hash: t.from },
-          to: { hash: t.to },
-          value: t.value,
-          timestamp: new Date(parseInt(t.timeStamp) * 1000).toISOString(),
-        })));
+        const items = j.result.map(toActivityTransaction).filter((item): item is ActivityTransaction => item !== null);
+        setActivity(items);
         return;
       }
     } catch {}
     // 2) Blockscout (browser se)
     try {
       const r = await fetch(`${blockscout[netId]}/api/v2/addresses/${addr}/transactions?limit=10`);
-      const j = await r.json();
+      const j = await r.json() as { items?: unknown };
       if (Array.isArray(j.items) && j.items.length > 0) {
-        setActivity(j.items.slice(0, 8));
+        const items = j.items.map(toActivityTransaction).filter((item): item is ActivityTransaction => item !== null);
+        setActivity(items.slice(0, 8));
         return;
       }
     } catch {}
     // 3) Server proxy fallback
     try {
-      const r = await fetch(`/api/activity?net=${netId}&address=${addr}`);
-      const j = await r.json();
-      setActivity((j.items || []).slice(0, 8));
+      const api = new ApiClient(window.location.origin);
+      const j = await api.getWalletActivity({ query: { net: netId, address: addr } }) as { items?: unknown };
+      const items = Array.isArray(j.items) ? j.items.map(toActivityTransaction).filter((item): item is ActivityTransaction => item !== null) : [];
+      setActivity(items.slice(0, 8));
     } catch {
       setActivity([]);
     }
@@ -89,38 +128,49 @@ export default function Dashboard() {
       return;
     }
     const provider = new JsonRpcProvider(window.location.origin + `/api/rpc?net=${network.id}`);
-    const w = new Wallet(pk, provider);
-    setWallet(w);
-    setAddress(w.address);
-    setPrivateKey(pk);
-    setBalance(null);
-    setTxHash('');
-    setError('');
-    (async () => {
+    const walletInstance = new Wallet(pk, provider);
+    const initializeWallet = async () => {
+      setWallet(walletInstance);
+      setAddress(walletInstance.address);
+      setPrivateKey(pk);
+      setBalance(null);
+      setTxHash('');
+      setError('');
       try {
-        const hex = await rpcCall(network.id, 'eth_getBalance', [w.address, 'latest']);
-        setBalance(formatEther(BigInt(hex)));
+        const hex = await rpcCall(network.id, 'eth_getBalance', [walletInstance.address, 'latest']);
+        setBalance(formatEther(BigInt(String(hex))));
       } catch {
         setBalance('0');
       }
-    })();
-    loadActivity(network.id, w.address);
-  }, [netIndex, router]);
+      loadActivity(network.id, walletInstance.address);
+    };
+    void initializeWallet();
+  }, [network.id, router]);
+
+  useEffect(() => {
+    const updateTime = () => setNow(Date.now());
+    const frame = window.requestAnimationFrame(updateTime);
+    const interval = window.setInterval(updateTime, 60_000);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${network.binance}`)
       .then(r => r.json())
-      .then(d => setPrice(parseFloat(d.price)))
+      .then((data: { price?: string }) => setPrice(parseFloat(data.price || '0')))
       .catch(() => {});
     const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${network.binance.toLowerCase()}@miniTicker`);
     ws.onmessage = (e) => {
       try {
-        const d = JSON.parse(e.data);
-        setPrice(parseFloat(d.c));
+        const data = JSON.parse(e.data) as { c?: string };
+        setPrice(parseFloat(data.c || '0'));
       } catch {}
     };
     return () => ws.close();
-  }, [netIndex]);
+  }, [network.binance]);
 
   const copyAddress = () => {
     navigator.clipboard.writeText(address);
@@ -159,12 +209,14 @@ export default function Dashboard() {
       setTimeout(async () => {
         try {
           const hex = await rpcCall(network.id, 'eth_getBalance', [address, 'latest']);
-          setBalance(formatEther(BigInt(hex)));
+          setBalance(formatEther(BigInt(String(hex))));
         } catch {}
         loadActivity(network.id, address);
       }, 6000);
-    } catch (e: any) {
-      setError(e.shortMessage || e.message || 'Transaction fail ho gayi');
+    } catch (caught: unknown) {
+      const details = caught && typeof caught === 'object' ? caught as { shortMessage?: unknown; message?: unknown } : {};
+      const message = typeof details.shortMessage === 'string' ? details.shortMessage : typeof details.message === 'string' ? details.message : 'Transaction fail ho gayi';
+      setError(message);
     }
     setSending(false);
   };
@@ -174,7 +226,8 @@ export default function Dashboard() {
   const shortAddr = (a: string) => (a ? `${a.slice(0, 6)}...${a.slice(-4)}` : 'Contract');
 
   const timeAgo = (ts: string) => {
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (!now) return 'abhi abhi';
+    const m = Math.floor((now - new Date(ts).getTime()) / 60000);
     if (m < 1) return 'abhi abhi';
     if (m < 60) return `${m} min pehle`;
     const h = Math.floor(m / 60);
@@ -354,7 +407,7 @@ export default function Dashboard() {
             </p>
           ) : (
             <div className="space-y-3">
-              {activity.map((tx: any) => {
+              {activity.map((tx) => {
                 const isSent = (tx.from?.hash || '').toLowerCase() === address.toLowerCase();
                 return (
                   <a

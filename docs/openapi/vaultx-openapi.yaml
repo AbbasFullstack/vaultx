@@ -1,0 +1,175 @@
+openapi: 3.0.3
+info:
+  title: VaultX API
+  version: 1.0.0
+  description: |
+    Server-side proxy endpoints used by the VaultX multi-network Web3 wallet.
+    Provider credentials are configured only through server environment variables.
+servers:
+  - url: https://vaultx-mu.vercel.app
+    description: VaultX production deployment
+paths:
+  /api/rpc:
+    post:
+      tags: [Blockchain]
+      summary: Proxy an EVM JSON-RPC request to the selected testnet
+      operationId: proxyJsonRpcRequest
+      parameters:
+        - name: net
+          in: query
+          description: Target testnet. Unsupported values fall back to Polygon Amoy.
+          schema:
+            type: string
+            enum: [amoy, sepolia, base]
+            default: amoy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JsonRpcRequest'
+            examples:
+              getBalance:
+                summary: Read an account balance
+                value:
+                  jsonrpc: '2.0'
+                  id: 1
+                  method: eth_getBalance
+                  params:
+                    - '0x0000000000000000000000000000000000000000'
+                    - latest
+      responses:
+        '200':
+          description: JSON-RPC response returned by the provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonRpcResponse'
+        '503':
+          description: RPC provider is not configured on the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonRpcErrorResponse'
+  /api/activity:
+    get:
+      tags: [Activity]
+      summary: Get recent on-chain transactions for an address
+      operationId: getWalletActivity
+      parameters:
+        - name: net
+          in: query
+          description: Network used to resolve the supported EVM chain ID.
+          schema:
+            type: string
+            enum: [amoy, sepolia, base]
+            default: amoy
+        - name: address
+          in: query
+          description: Wallet address. An omitted address returns an empty item list.
+          schema:
+            type: string
+            example: '0x0000000000000000000000000000000000000000'
+      responses:
+        '200':
+          description: Recent transaction activity or an empty list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransactionActivity'
+        '503':
+          description: Activity provider is not configured on the server
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, error]
+                properties:
+                  items:
+                    type: array
+                    items: {}
+                  error:
+                    type: string
+components:
+  schemas:
+    JsonRpcRequest:
+      type: object
+      required: [jsonrpc, id, method, params]
+      properties:
+        jsonrpc:
+          type: string
+          enum: ['2.0']
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+        method:
+          type: string
+          example: eth_getBalance
+        params:
+          type: array
+          items: {}
+    JsonRpcResponse:
+      type: object
+      required: [jsonrpc, id]
+      properties:
+        jsonrpc:
+          type: string
+          enum: ['2.0']
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+        result: {}
+        error:
+          $ref: '#/components/schemas/JsonRpcError'
+    JsonRpcErrorResponse:
+      type: object
+      required: [jsonrpc, error, id]
+      properties:
+        jsonrpc:
+          type: string
+          enum: ['2.0']
+        error:
+          $ref: '#/components/schemas/JsonRpcError'
+        id:
+          type: integer
+          example: 1
+    JsonRpcError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          example: -32000
+        message:
+          type: string
+    TransactionActivity:
+      type: object
+      required: [hash, from, to, value, timestamp]
+      properties:
+        hash:
+          type: string
+        from:
+          type: object
+          required: [hash]
+          properties:
+            hash:
+              type: string
+        to:
+          type: object
+          required: [hash]
+          properties:
+            hash:
+              type: string
+        value:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

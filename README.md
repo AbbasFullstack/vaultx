@@ -73,10 +73,27 @@ Browser ──JSON-RPC──► /api/rpc (proxy) ──► Infura RPC (Amoy/Sepo
 git clone https://github.com/AbbasFullstack/vaultx.git
 cd vaultx/frontend
 npm install
+cp .env.example .env.local
+# Add INFURA_PROJECT_ID and ETHERSCAN_API_KEY to .env.local
 npm run dev
 ```
 
-> 🔑 RPC ke liye Infura ka free API key `app/api/rpc/route.ts` mein lagayein
+> 🔑 Provider keys ko sirf `.env.local` aur Vercel Environment Variables mein rakhein. API keys, private keys, seed phrases aur `.env.local` ko GitHub par kabhi commit na karein.
+
+---
+
+## 📘 OpenAPI Contract
+
+VaultX ke server-side API proxy contract ko OpenAPI 3.0 specification mein document kiya gaya hai:
+
+- **Specification:** [`docs/openapi/vaultx-openapi.yaml`](docs/openapi/vaultx-openapi.yaml)
+- **Covered endpoints:** `POST /api/rpc` aur `GET /api/activity`
+- **Generated client:** [`frontend/lib/generated/vaultx-api-client.ts`](frontend/lib/generated/vaultx-api-client.ts)
+- **OpenAPI Forge workflow:** spec ko OpenAPI Forge mein upload karein, validate karein, API documentation aur mock responses review karein, phir TypeScript client SDK generate karein.
+
+VaultX dashboard ke RPC aur server-side activity fallback calls generated client methods (`proxyJsonRpcRequest` aur `getWalletActivity`) use karte hain. Jab specification change ho, client file ko OpenAPI Forge se regenerate karke update karein.
+
+> Provider credentials specification mein intentionally included nahi hain. Document sirf request/response contract aur safe example values describe karta hai.
 
 ---
 
@@ -93,8 +110,13 @@ vaultx/
     │   ├── import/page.tsx         # Import phrase/key
     │   ├── dashboard/page.tsx      # Balances + send + activity
     │   └── page.tsx                # Unlock / account switch
-    └── lib/
-        └── wallet.ts               # Keystore helpers
+    ├── docs/
+    │   └── openapi/
+    │       └── vaultx-openapi.yaml # API contract for OpenAPI Forge
+    └── frontend/
+        ├── .env.example            # Required provider variable names only
+        └── lib/
+            └── wallet.ts           # Keystore helpers
 ```
 
 ---
@@ -102,6 +124,8 @@ vaultx/
 ## ⚠️ Security Note
 
 Yeh ek **learning project** hai. Keys browser mein password-encrypted save hoti hain (industry standard keystore format). Phir bhi: **asli funds kabhi test wallets mein na rakhein!**
+
+If provider credentials were ever committed or shared, revoke/rotate them in the relevant provider dashboards, replace them in Vercel Environment Variables, and redeploy before treating the project as publicly safe.
 
 ---
 

@@ -14,7 +14,8 @@ export default function Home() {
   const [unlocking, setUnlocking] = useState(false);
 
   useEffect(() => {
-    setExists(hasWallet());
+    const frame = window.requestAnimationFrame(() => setExists(hasWallet()));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const unlock = async () => {
