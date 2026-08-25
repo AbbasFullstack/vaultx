@@ -4,7 +4,9 @@
 
 <img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&weight=600&size=24&pause=1000&color=8B5CF6&center=true&vCenter=true&width=700&lines=Your+Keys+Your+Crypto;Multi-Chain:+Polygon+%E2%80%A2+Ethereum+%E2%80%A2+Base;Encrypted+Keystore+%2B+Mnemonic" alt="Typing SVG"/>
 
-**Secure, modern Web3 wallet - create, import & manage your keys across 3 networks**
+**Testnet Web3 wallet learning project — create, import, and explore wallet flows across Polygon Amoy, Ethereum Sepolia, and Base Sepolia.**
+
+> **Learning project · Testnet networks only · Never use real funds or production seed phrases.**
 
 [![LIVE DEMO](https://img.shields.io/badge/🚀_LIVE_DEMO-vaultx--mu.vercel.app-8B5CF6?style=for-the-badge&logo=vercel&logoColor=white)](https://vaultx-mu.vercel.app)
 
@@ -101,22 +103,23 @@ VaultX dashboard ke RPC aur server-side activity fallback calls generated client
 
 ```text
 vaultx/
+├── docs/
+│   └── openapi/
+│       └── vaultx-openapi.yaml     # API contract for OpenAPI Forge
 └── frontend/
     ├── app/
     │   ├── api/
-    │   │   ├── rpc/route.ts        # RPC proxy (3 networks)
-    │   │   └── activity/route.ts   # Transaction history
+    │   │   ├── rpc/route.ts        # RPC proxy (3 testnet networks)
+    │   │   └── activity/route.ts   # Activity-history fallback
     │   ├── create/page.tsx         # Wallet creation + mnemonic
     │   ├── import/page.tsx         # Import phrase/key
-    │   ├── dashboard/page.tsx      # Balances + send + activity
-    │   └── page.tsx                # Unlock / account switch
-    ├── docs/
-    │   └── openapi/
-    │       └── vaultx-openapi.yaml # API contract for OpenAPI Forge
-    └── frontend/
-        ├── .env.example            # Required provider variable names only
-        └── lib/
-            └── wallet.ts           # Keystore helpers
+    │   ├── dashboard/page.tsx      # Testnet balances + send + activity
+    │   └── page.tsx                # Landing + unlock / account switch
+    ├── lib/
+    │   ├── generated/
+    │   │   └── vaultx-api-client.ts # Generated OpenAPI client
+    │   └── wallet.ts               # Local keystore helpers
+    └── .env.example                # Required provider variable names only
 ```
 
 ---
@@ -139,11 +142,11 @@ If provider credentials were ever committed or shared, revoke/rotate them in the
 *Full-Stack & Web3 Developer*
 
 [![GitHub](https://img.shields.io/badge/GitHub-AbbasFullstack-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/AbbasFullstack)
-[![Email](https://img.shields.io/badge/abbaswebdevelopers@gmail.com-Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:abbaswebdevelopers@gmail.com)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Live_Projects-2563EB?style=for-the-badge&logo=vercel&logoColor=white)](https://abbas-portfolio-beta.vercel.app)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Abbas_Hussain-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/abbas-hussain-56a61338b/)
 
-> 🎯 Self-taught developer building production-ready apps
+> 🎯 Self-taught full-stack developer building public learning projects across Web3, APIs, and developer tooling.
 > ⛓️ Next.js • TypeScript • ethers.js • Supabase • WebSocket APIs
-> 📱 **Fun fact:** this entire wallet was built using only a mobile phone!
 
 ### 📊 Development Activity
 
