@@ -86,24 +86,27 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="grid flex-1 items-center gap-12 py-12 lg:grid-cols-[1.03fr_0.97fr] lg:py-16">
-          <div className="relative z-10 max-w-2xl">
+        <section className="grid min-w-0 flex-1 items-center gap-12 py-12 lg:grid-cols-[1.03fr_0.97fr] lg:py-16">
+          <div className="relative z-10 w-full min-w-0 max-w-2xl">
             <div className="vault-reveal inline-flex items-center gap-2 rounded-full border border-violet-300/15 bg-violet-400/[0.07] px-3 py-1.5 text-xs font-semibold text-violet-100/90 shadow-[0_0_26px_rgba(139,92,246,0.12)]">
               <Sparkles className="h-3.5 w-3.5 text-violet-300" aria-hidden="true" />
               <span>Private-by-design learning workflow</span>
             </div>
 
-            <h1 className="vault-reveal vault-reveal-delay-1 mt-6 max-w-xl text-5xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-7xl">
-              Explore testnet assets with a <span className="bg-gradient-to-r from-violet-200 via-fuchsia-300 to-sky-300 bg-clip-text text-transparent">vault-like</span> flow.
+            <h1 className="vault-headline vault-reveal vault-reveal-delay-1 mt-6 max-w-xl text-5xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-7xl">
+              <span className="block">Explore testnet</span>
+              <span className="block">assets with a</span>
+              <span className="block bg-gradient-to-r from-violet-200 via-fuchsia-300 to-sky-300 bg-clip-text text-transparent">vault-like flow.</span>
             </h1>
 
-            <p className="vault-reveal vault-reveal-delay-2 mt-6 max-w-xl text-base leading-7 text-white/58 sm:text-lg">
-              Create or import a wallet, switch between Polygon Amoy, Ethereum Sepolia, and Base Sepolia, and explore key-management workflows in a focused local workspace.
+            <p className="vault-reveal vault-reveal-delay-2 mt-6 w-full max-w-xl break-words text-base leading-7 text-white/58 sm:text-lg">
+              <span className="sm:hidden">Explore wallet flows across three testnets in a focused local workspace.</span>
+              <span className="hidden sm:inline">Create or import a wallet, switch between Polygon Amoy, Ethereum Sepolia, and Base Sepolia, and explore key-management workflows in a focused local workspace.</span>
             </p>
 
-            <div className="vault-reveal vault-reveal-delay-3 mt-8 flex items-start gap-3 rounded-2xl border border-amber-200/10 bg-amber-200/[0.045] p-4 text-sm leading-6 text-amber-50/85">
+            <div className="vault-reveal vault-reveal-delay-3 mt-8 flex w-full max-w-xl items-start gap-3 overflow-hidden rounded-2xl border border-amber-200/10 bg-amber-200/[0.045] p-4 text-sm leading-6 text-amber-50/85">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
-              <p><strong className="font-semibold text-amber-100">Learning project · Testnet networks only.</strong> Never use real funds or production seed phrases.</p>
+              <p className="break-words"><span className="sm:hidden"><strong className="font-semibold text-amber-100">Testnet only.</strong> Never use real funds or a production seed phrase.</span><span className="hidden sm:inline"><strong className="font-semibold text-amber-100">Learning project · Testnet networks only.</strong> Never use real funds or production seed phrases.</span></p>
             </div>
 
             {exists ? (
@@ -129,14 +132,14 @@ export default function Home() {
                 <button onClick={deleteWallet} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-transparent px-3 py-2 text-xs font-semibold text-white/42 transition hover:border-red-400/20 hover:bg-red-400/[0.06] hover:text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Delete local vault</button>
               </section>
             ) : (
-              <div className="vault-reveal vault-reveal-delay-4 mt-8 grid gap-3 sm:max-w-lg sm:grid-cols-2">
-                <Link href="/create" className="group flex min-h-16 items-center justify-between rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-blue-500 p-4 font-bold shadow-xl shadow-violet-500/25 transition duration-200 hover:-translate-y-1 hover:shadow-violet-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-100 active:translate-y-0"><span className="flex items-center gap-2"><KeyRound className="h-5 w-5" aria-hidden="true" />Create wallet</span><ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" /></Link>
-                <Link href="/import" className="group flex min-h-16 items-center justify-between rounded-2xl border border-white/12 bg-white/[0.045] p-4 font-bold text-white/80 shadow-lg shadow-black/10 transition duration-200 hover:-translate-y-1 hover:border-violet-300/35 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-100 active:translate-y-0"><span className="flex items-center gap-2"><Download className="h-5 w-5" aria-hidden="true" />Import wallet</span><ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" /></Link>
+              <div className="vault-reveal vault-reveal-delay-4 mt-8 grid w-full max-w-lg gap-3 sm:grid-cols-2">
+                <Link href="/create" className="group flex min-h-16 w-full min-w-0 items-center justify-between rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-blue-500 p-4 font-bold shadow-xl shadow-violet-500/25 transition duration-200 hover:-translate-y-1 hover:shadow-violet-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-100 active:translate-y-0"><span className="flex min-w-0 items-center gap-2"><KeyRound className="h-5 w-5 shrink-0" aria-hidden="true" />Create wallet</span><ArrowRight className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" /></Link>
+                <Link href="/import" className="group flex min-h-16 w-full min-w-0 items-center justify-between rounded-2xl border border-white/12 bg-white/[0.045] p-4 font-bold text-white/80 shadow-lg shadow-black/10 transition duration-200 hover:-translate-y-1 hover:border-violet-300/35 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-100 active:translate-y-0"><span className="flex min-w-0 items-center gap-2"><Download className="h-5 w-5 shrink-0" aria-hidden="true" />Import wallet</span><ArrowRight className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" /></Link>
               </div>
             )}
           </div>
 
-          <div className="relative mx-auto w-full max-w-xl lg:max-w-none" aria-label="VaultX testnet wallet visual">
+          <div className="relative mx-auto w-full min-w-0 max-w-xl lg:max-w-none" aria-label="VaultX testnet wallet visual">
             <div className="vault-stage relative aspect-square min-h-[390px] overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/[0.09] via-white/[0.025] to-violet-500/[0.05] shadow-[0_30px_100px_rgba(0,0,0,0.42)] sm:min-h-[470px]">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.24),transparent_26%),radial-gradient(circle_at_18%_22%,rgba(56,189,248,0.15),transparent_22%),radial-gradient(circle_at_80%_82%,rgba(16,185,129,0.12),transparent_24%)]" />
               <div className="vault-orbit absolute left-1/2 top-1/2 h-[68%] w-[68%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-200/20" aria-hidden="true"><span className="absolute -left-1.5 top-1/2 h-3 w-3 rounded-full bg-violet-300 shadow-[0_0_16px_rgba(196,181,253,0.9)]" /></div>
